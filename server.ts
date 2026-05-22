@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import multer from "multer";
 import fs from "fs";
+import os from "os";
 
 dotenv.config();
 
@@ -34,9 +35,15 @@ if (supabaseUrl && supabaseAnonKey) {
 }
 
 // Ensure uploads directory exists
-const UPLOADS_DIR = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+const isVercel = !!process.env.VERCEL;
+const UPLOADS_DIR = isVercel ? path.join(os.tmpdir(), "uploads") : path.join(process.cwd(), "uploads");
+
+try {
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+} catch (err: any) {
+  console.warn("⚠️ Failed to create uploads directory:", err.message || err);
 }
 
 // Config Multer for local storage
@@ -606,7 +613,7 @@ async function startServer() {
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (!process.env.VERCEL) {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
