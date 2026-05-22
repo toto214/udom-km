@@ -20,11 +20,19 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn("⚠️ SUPABASE_URL or SUPABASE_ANON_KEY is missing. Database features will not work.");
 }
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-// Use Service Role Key for server-side storage if available to bypass RLS policies
-const supabaseStorageClient = supabaseServiceKey 
-  ? createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false, autoRefreshToken: false } })
-  : supabase;
+let supabase: any = null;
+let supabaseStorageClient: any = null;
+
+if (supabaseUrl && supabaseAnonKey) {
+  try {
+    supabase = createClient(supabaseUrl, supabaseAnonKey);
+    supabaseStorageClient = supabaseServiceKey 
+      ? createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false, autoRefreshToken: false } })
+      : supabase;
+  } catch (e: any) {
+    console.error("❌ Failed to initialize Supabase client:", e.message || e);
+  }
+}
 
 // Ensure uploads directory exists
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
@@ -53,31 +61,29 @@ app.use(express.json());
 // Serve uploaded files statically
 app.use("/uploads", express.static(UPLOADS_DIR));
 
-async function startServer() {
-  // Server-side connection test
-  try {
-    const { data, error } = await supabase.from('products').select('count', { count: 'exact', head: true });
-    if (error) {
-      console.warn("⚠️ Supabase connection test failed:", error.message);
-    } else {
-      console.log("✅ Supabase connected successfully!");
-    }
-  } catch (e) {
-    console.error("❌ Supabase connection error:", e);
+// Intercept all API calls and return a friendly error if Supabase isn't configured
+app.use("/api", (req, res, next) => {
+  if (!supabase) {
+    return res.status(503).json({
+      error: "Database Connection Error",
+      message: "Supabase environment variables (SUPABASE_URL and SUPABASE_ANON_KEY) are missing or invalid on Vercel. Please add them in your Vercel Project Settings > Environment Variables."
+    });
   }
+  next();
+});
 
-  // --- API Routes ---
+// --- API Routes ---
 
-  // Connection Test Endpoint
-  app.get("/api/db-test", async (req, res) => {
-    try {
-      const { data, error } = await supabase.from('products').select('id').limit(1);
-      if (error) throw error;
-      res.json({ status: "connected", message: "Supabase connection is working!", data });
-    } catch (error: any) {
-      res.status(500).json({ status: "error", message: error.message });
-    }
-  });
+// Connection Test Endpoint
+app.get("/api/db-test", async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('products').select('id').limit(1);
+    if (error) throw error;
+    res.json({ status: "connected", message: "Supabase connection is working!", data });
+  } catch (error: any) {
+    res.status(500).json({ status: "error", message: error.message });
+  }
+});
 
   // File Upload Route
   app.post("/api/upload", (req, res, next) => {
@@ -568,15 +574,30 @@ async function startServer() {
     }
   });
 
-  // --- Global Express Error Handler ---
-  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error("🔥 Unhandled Express Error:", err);
-    res.status(500).json({ 
-      error: "Internal Server Error", 
-      message: err.message || "Something went wrong on the server",
-      details: err.stack || err
-    });
+// --- Global Express Error Handler ---
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("🔥 Unhandled Express Error:", err);
+  res.status(500).json({ 
+    error: "Internal Server Error", 
+    message: err.message || "Something went wrong on the server",
+    details: err.stack || err
   });
+});
+
+async function startServer() {
+  // Server-side connection test
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from('products').select('count', { count: 'exact', head: true });
+      if (error) {
+        console.warn("⚠️ Supabase connection test failed:", error.message);
+      } else {
+        console.log("✅ Supabase connected successfully!");
+      }
+    } catch (e) {
+      console.error("❌ Supabase connection error:", e);
+    }
+  }
 
   // --- Vite Middleware ---
   if (process.env.NODE_ENV !== "production") {
