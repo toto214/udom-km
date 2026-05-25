@@ -506,7 +506,7 @@ export default function App() {
         <div className={cn("p-6 flex items-center", isSidebarCollapsed ? "justify-center" : "justify-between")}>
           {!isSidebarCollapsed && (
             <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}>
-              <h1 className="text-2xl font-bold tracking-tight">Udom_App</h1>
+              <h1 className="text-2xl font-bold tracking-tight">LouangUdom_Km</h1>
               <p className="text-xs text-secondary mt-1 uppercase tracking-widest font-medium">ระบบจัดการร้านค้า</p>
             </motion.div>
           )}
@@ -518,8 +518,8 @@ export default function App() {
         <nav className="flex-1 px-4 py-4 space-y-2">
           <SidebarItem icon={<LayoutDashboard size={20} />} label="ภาพรวม" active={activeTab === 'dashboard'} isCollapsed={isSidebarCollapsed} onClick={() => setActiveTab('dashboard')} />
           <SidebarItem icon={<Package size={20} />} label="คลังสินค้า" active={activeTab === 'inventory'} isCollapsed={isSidebarCollapsed} onClick={() => setActiveTab('inventory')} />
-          <SidebarItem icon={<BarChart3 size={20} />} label="รายงาน" active={activeTab === 'reports'} isCollapsed={isSidebarCollapsed} onClick={() => setActiveTab('reports')} />
           <SidebarItem icon={<ShoppingCart size={20} />} label="การขาย" active={activeTab === 'pos' || activeTab === 'sales'} isCollapsed={isSidebarCollapsed} onClick={() => setActiveTab('pos')} />
+          <SidebarItem icon={<BarChart3 size={20} />} label="รายงาน" active={activeTab === 'reports'} isCollapsed={isSidebarCollapsed} onClick={() => setActiveTab('reports')} />
         </nav>
 
         <div className="p-4 border-t border-slate-700/50">

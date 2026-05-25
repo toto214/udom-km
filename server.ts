@@ -29,6 +29,26 @@ if (supabaseUrl && supabaseAnonKey) {
     supabaseStorageClient = supabaseServiceKey 
       ? createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false, autoRefreshToken: false } })
       : supabase;
+    
+    // Proactively attempt to create the public bucket 'product-images' if it doesn't exist
+    if (supabaseStorageClient) {
+      supabaseStorageClient.storage.createBucket("product-images", {
+        public: true,
+        fileSizeLimit: 5242880 // 5MB limit
+      }).then(({ data, error }: any) => {
+        if (error) {
+          if (error.message && error.message.includes("already exists")) {
+            console.log("📦 Supabase Storage bucket 'product-images' already exists.");
+          } else {
+            console.warn("⚠️ Proactive creation of 'product-images' bucket skipped/failed:", error.message);
+          }
+        } else {
+          console.log("✅ Successfully created public Supabase Storage bucket 'product-images'!");
+        }
+      }).catch((err: any) => {
+        console.warn("⚠️ Exception during database bucket check:", err.message || err);
+      });
+    }
   } catch (e: any) {
     console.error("❌ Failed to initialize Supabase client:", e.message || e);
   }
@@ -156,7 +176,27 @@ app.get("/api/db-test", async (req, res) => {
         }
       }
 
-      // 2. Fallback to local uploads path (works for local dev / non-serverless)
+      // 2. Fallback to local uploads path or Base64 (for serverless environments)
+      if (isVercel) {
+        try {
+          const fileBuffer = fs.readFileSync(req.file.path);
+          const base64Data = fileBuffer.toString("base64");
+          const base64Url = `data:${req.file.mimetype || 'image/jpeg'};base64,${base64Data}`;
+          console.log("✅ Serverless Fallback: Converted uploaded file to Base64 URL.");
+          
+          // Clean up the local temp file after converting
+          try {
+            fs.unlinkSync(req.file.path);
+          } catch (e) {
+            console.warn("⚠️ Failed to delete local temp file after Base64 conversion:", e);
+          }
+          
+          return res.json({ imageUrl: base64Url });
+        } catch (base64Err: any) {
+          console.error("🔥 Serverless Base64 conversion failed:", base64Err);
+        }
+      }
+
       const imageUrl = `/uploads/${req.file.filename}`;
       console.log("✅ File uploaded locally:", imageUrl);
       res.json({ imageUrl });
